@@ -1,6 +1,6 @@
 module web-gee
 
-go 1.15
+go 1.16
 
 require (
 	gee v0.0.0
