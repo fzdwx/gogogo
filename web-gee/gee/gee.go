@@ -41,8 +41,3 @@ func (e Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// 然后进行处理
 	e.router.handle(c)
 }
-
-// 工具方法
-func makeRouteKey(method string, path string) string {
-	return method + "-" + path
-}

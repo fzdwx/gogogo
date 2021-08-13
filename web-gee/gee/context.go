@@ -11,9 +11,12 @@ type H map[string]interface{}
 type Context struct {
 	Writer  http.ResponseWriter
 	request *http.Request
-	Path    string
-	Method  string
-	status  int
+	// request info
+	Path   string
+	Method string
+	Params map[string]string
+	// response info
+	status int
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
@@ -23,6 +26,12 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Path:    req.URL.Path,
 		Method:  req.Method,
 	}
+}
+
+// ================================ request start
+
+func (c Context) Param(key string) string {
+	return c.Params[key]
 }
 
 // PostFrom 从post请求从获取key对应的value
@@ -40,6 +49,8 @@ func (c Context) Status(code int) {
 	c.status = code
 	c.Writer.WriteHeader(code)
 }
+
+// ================================ response start
 
 // SetHeader 设置当前响应的响应头
 func (c Context) SetHeader(key string, value string) {
