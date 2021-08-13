@@ -63,16 +63,19 @@ func (r *router) getRouter(method string, path string) (*node, map[string]string
 
 // handle 处理当前请求，遍历路由表，找到对应的handlerFunc进行处理
 func (r router) handle(c *Context) {
-
 	n, params := r.getRouter(c.Method, c.Path)
+
 	if n != nil {
 		c.Params = params
 		key := makeRouteKey(c.Method, n.pattern)
 		// 路由匹配成功，调用用户实现的handlerFunc
 		r.handlers[key](c)
 	} else {
-		c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		c.handlers = append(c.handlers, func(context *Context) {
+			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		})
 	}
+	c.Next()
 }
 
 // 工具方法
