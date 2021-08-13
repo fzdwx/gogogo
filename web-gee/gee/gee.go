@@ -1,43 +1,76 @@
 package gee
 
 import (
+	"log"
 	"net/http"
 )
 
-// HandlerFunc 请求处理器  给用户去实现
-type HandlerFunc func(ctx *Context)
+// HandlerFunc defines the request handler used by gee
+type HandlerFunc func(*Context)
 
-// Engine 实现 ServerHttp
-type Engine struct {
-	router *router
-}
+// Engine implement the interface of ServeHTTP
+type (
+	RouterGroup struct {
+		prefix      string
+		middlewares []HandlerFunc // support middleware
+		parent      *RouterGroup  // support nesting
+		engine      *Engine       // all groups share a Engine instance
+	}
 
-// New 构造函数 初始化router
+	Engine struct {
+		*RouterGroup
+		router *router
+		groups []*RouterGroup // store all groups
+	}
+)
+
+// New is the constructor of gee.Engine
 func New() *Engine {
-	return &Engine{router: newRouter()}
+	engine := &Engine{router: newRouter()}
+	engine.RouterGroup = &RouterGroup{engine: engine}
+	engine.groups = []*RouterGroup{engine.RouterGroup}
+	return engine
 }
 
-// GET 添加一个GET方式的请求处理器
-func (e Engine) GET(path string, handler HandlerFunc) *Engine {
-	e.router.addRouter("GET", path, handler)
-	return &e
+// Group is defined to create a new RouterGroup
+// remember all groups share the same Engine instance
+func (group *RouterGroup) Group(prefix string) *RouterGroup {
+	engine := group.engine
+	newGroup := &RouterGroup{
+		prefix: group.prefix + prefix,
+		parent: group,
+		engine: engine,
+	}
+	engine.groups = append(engine.groups, newGroup)
+	return newGroup
 }
 
-// POST 添加一个POST方式的请求处理器
-func (e Engine) POST(path string, handler HandlerFunc) *Engine {
-	e.router.addRouter("POST", path, handler)
-	return &e
+func (group *RouterGroup) addRoute(method string, comp string, handler HandlerFunc) *RouterGroup {
+	pattern := group.prefix + comp
+	log.Printf("Route %4s - %s", method, pattern)
+	group.engine.router.addRouter(method, pattern, handler)
+	return group
 }
 
-// Run 启动http服务器
-func (e Engine) Run(addr string) (err error) {
-	return http.ListenAndServe(addr, e)
+// GET defines the method to add GET request
+func (group *RouterGroup) GET(pattern string, handler HandlerFunc) *RouterGroup {
+	group.addRoute("GET", pattern, handler)
+	return group
 }
 
-// ServeHTTP 每次请求进来都调用这个方法进行处理
-func (e Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// 每次请求都new一个上下文
+// POST defines the method to add POST request
+func (group *RouterGroup) POST(pattern string, handler HandlerFunc) *RouterGroup {
+
+	group.addRoute("POST", pattern, handler)
+	return group
+}
+
+// Run defines the method to start a http server
+func (engine *Engine) Run(addr string) (err error) {
+	return http.ListenAndServe(addr, engine)
+}
+
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	c := newContext(w, req)
-	// 然后进行处理
-	e.router.handle(c)
+	engine.router.handle(c)
 }
