@@ -17,7 +17,7 @@ type node struct {
 }
 
 // 第一个匹配成功的节点，用于插入
-func (n node) matchChild(part string) *node {
+func (n *node) matchChild(part string) *node {
 	for _, child := range n.children {
 		if child.part == part || child.isWild {
 			return child
@@ -27,7 +27,7 @@ func (n node) matchChild(part string) *node {
 }
 
 // 所有匹配成功的节点，用于查找
-func (n node) matchChildren(part string) []*node {
+func (n *node) matchChildren(part string) []*node {
 	nodes := make([]*node, 0)
 	for _, child := range n.children {
 		if child.part == part || child.isWild {
@@ -41,7 +41,7 @@ func (n node) matchChildren(part string) []*node {
 // /p/:lang/doc 只有在第三层节点时，即doc节点，才会设置为/p/:lang/doc。
 // p和:lang的pattern属性都为空。因此，当匹配结束时，才能使用n.pattern == ""
 // 来判断路由是否匹配成功.
-func (n node) insert(pattern string, parts []string, height int) {
+func (n *node) insert(pattern string, parts []string, height int) {
 	if len(parts) == height {
 		n.pattern = pattern
 		return
