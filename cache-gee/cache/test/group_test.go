@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"testing"
 
 	"cache"
@@ -42,4 +43,21 @@ func TestGroupGet(t *testing.T) {
 	if view, err := gee.Get("unknown"); err == nil {
 		t.Fatalf("the value of unknow should be empty, but %s got", view)
 	}
+}
+
+func TestHttp(t *testing.T) {
+
+	cache.NewGroup("scores", 2<<10, cache.GetterFunc(
+		func(key string) ([]byte, error) {
+			log.Println("[SlowDB] search key", key)
+			if v, ok := db[key]; ok {
+				return []byte(v), nil
+			}
+			return nil, fmt.Errorf("%s not exist", key)
+		}))
+
+	addr := "localhost:9999"
+	peers := cache.NewHttpPool(addr)
+	log.Println("cache server is running at", addr)
+	log.Fatal(http.ListenAndServe(addr, peers))
 }

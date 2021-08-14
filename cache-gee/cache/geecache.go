@@ -55,7 +55,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 
 // GetGroup returns the named group previously created with NewGroup, or
 // nil if there's no such group.
-func (g *Group) GetGroup(name string) *Group {
+func GetGroup(name string) *Group {
 	mtx.RLock()
 	group := groups[name]
 	mtx.RUnlock()
