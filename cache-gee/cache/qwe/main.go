@@ -56,7 +56,7 @@ func main() {
 	var port int
 	var api bool
 	flag.IntVar(&port, "port", 8001, "cache server port")
-	flag.BoolVar(&api, "api", false, "Start a api server?")
+	flag.BoolVar(&api, "api", true, "Start a api server?")
 	flag.Parse()
 
 	apiAddr := "http://localhost:9999"
@@ -75,5 +75,7 @@ func main() {
 	if api {
 		go startAPIServer(apiAddr, gee)
 	}
-	startCacheServer(addrMap[port], []string(addrs), gee)
+	go startCacheServer(addrMap[8001], addrs, gee)
+	go startCacheServer(addrMap[8002], addrs, gee)
+	go startCacheServer(addrMap[8003], addrs, gee)
 }
