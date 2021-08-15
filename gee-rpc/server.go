@@ -36,7 +36,12 @@ func (s *Server) Accept(lis net.Listener) {
 	}
 }
 
-// ServeConn 处理conn的请求
+// Accept 接收连接
+func Accept(lis net.Listener) {
+	DefaultServer.Accept(lis)
+}
+
+// ServeConn 处理conn的请求 主要是接收客户端的一次发包，解析魔数是否匹配，以及使用的编解协议
 func (s *Server) ServeConn(conn io.ReadWriteCloser) {
 	defer func() { _ = conn.Close() }()
 
@@ -57,6 +62,8 @@ func (s *Server) ServeConn(conn io.ReadWriteCloser) {
 		log.Printf("rpc server: invalid codec type %s", opt.CodecType)
 		return
 	}
+
+	// 魔数匹配，编码协议解析正确
 	s.serveCodec(f(conn))
 }
 
@@ -139,11 +146,6 @@ func (s *Server) handleRequest(c codec.Codec, req *request, sending *sync.Mutex,
 	log.Println(req.h, req.argValues.Elem())
 	req.replyValue = reflect.ValueOf(fmt.Sprintf("rpc reponse %d", req.h.Seq))
 	s.sendResponse(c, req.h, req.replyValue.Interface(), sending)
-}
-
-// Accept 接收连接
-func Accept(lis net.Listener) {
-	DefaultServer.Accept(lis)
 }
 
 // invalidRequest is a placeholder for response argv when error occurs
