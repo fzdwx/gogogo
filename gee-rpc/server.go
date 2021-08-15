@@ -2,11 +2,12 @@ package gee_rpc
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"log"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 
 	"gee-rpc/codec"
@@ -14,6 +15,7 @@ import (
 
 // Server rpc服务提供者
 type Server struct {
+	serviceMap sync.Map
 }
 
 // NewServer 构造函数
@@ -67,6 +69,40 @@ func (s *Server) ServeConn(conn io.ReadWriteCloser) {
 	s.serveCodec(f(conn))
 }
 
+// Register publishes the receiver's methods in the DefaultServer.
+func Register(rcvr interface{}) error { return DefaultServer.Register(rcvr) }
+
+// Register publishes in the server the set of methods of the
+func (s *Server) Register(rcvr interface{}) error {
+	service := newService(rcvr)
+	_, dup := s.serviceMap.LoadOrStore(service.name, service)
+	if dup {
+		return errors.New("rpc: service already defined: " + service.name)
+	}
+	return nil
+}
+
+func (s *Server) findService(serviceMethod string) (svc *service, mtype *methodType, err error) {
+	dot := strings.LastIndex(serviceMethod, ".")
+	if dot < 0 {
+		err = errors.New("rpc server: service/method request ill-formed: " + serviceMethod)
+		return
+	}
+	serviceName, methodName := serviceMethod[:dot], serviceMethod[dot+1:]
+
+	svci, ok := s.serviceMap.Load(serviceName)
+	if !ok {
+		err = errors.New("rpc server: can't find service " + serviceName)
+		return
+	}
+	svc = svci.(*service)
+	mtype = svc.method[methodName]
+	if mtype == nil {
+		err = errors.New("rpc server: can't find method " + methodName)
+	}
+	return
+}
+
 func (s *Server) serveCodec(c codec.Codec) {
 	sending := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
@@ -94,6 +130,8 @@ func (s *Server) serveCodec(c codec.Codec) {
 type request struct {
 	h                     *codec.RequestHeader // header of request
 	argValues, replyValue reflect.Value        // argv and replyv of request
+	mtType                *methodType
+	service               *service
 }
 
 // readRequest 解析请求
@@ -105,13 +143,22 @@ func (s *Server) readRequest(c codec.Codec) (*request, error) {
 	req := &request{
 		h: header,
 	}
-	// todo unKnow type 读取请求中的请求参数以及返回值类型
-	req.argValues = reflect.New(reflect.TypeOf(""))
-	err = c.ReadBody(req.argValues.Interface())
+	req.service, req.mtType, err = s.findService(header.ServiceMethod)
 	if err != nil {
-		log.Println("rpc server: read argv err:", err)
+		return req, err
 	}
+	req.argValues = req.mtType.newArgv()
+	req.replyValue = req.mtType.newReplayValue()
 
+	// make sure that argvi is a pointer, ReadBody need a pointer as parameter
+	argvi := req.argValues.Interface()
+	if req.argValues.Type().Kind() != reflect.Ptr {
+		argvi = req.argValues.Addr().Interface()
+	}
+	if err = c.ReadBody(argvi); err != nil {
+		log.Println("rpc server: read body err:", err)
+		return req, err
+	}
 	return req, nil
 
 }
@@ -143,8 +190,12 @@ func (s *Server) sendResponse(c codec.Codec, h *codec.RequestHeader, body interf
 // handleRequest 处理请求
 func (s *Server) handleRequest(c codec.Codec, req *request, sending *sync.Mutex, wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println(req.h, req.argValues.Elem())
-	req.replyValue = reflect.ValueOf(fmt.Sprintf("rpc reponse %d", req.h.Seq))
+	err := req.service.call(req.mtType, req.argValues, req.replyValue)
+	if err != nil {
+		req.h.Error = err.Error()
+		s.sendResponse(c, req.h, invalidRequest, sending)
+		return
+	}
 	s.sendResponse(c, req.h, req.replyValue.Interface(), sending)
 }
 
