@@ -3,12 +3,14 @@ package gee_rpc
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"gee-rpc/codec"
 )
@@ -119,7 +121,7 @@ func (s *Server) serveCodec(c codec.Codec) {
 			continue
 		}
 		wg.Add(1)
-		go s.handleRequest(c, req, sending, wg)
+		go s.handleRequest(c, req, sending, wg, time.Second*3)
 	}
 	// 等待处理完成，关闭连接
 	wg.Wait()
@@ -188,15 +190,37 @@ func (s *Server) sendResponse(c codec.Codec, h *codec.RequestHeader, body interf
 }
 
 // handleRequest 处理请求
-func (s *Server) handleRequest(c codec.Codec, req *request, sending *sync.Mutex, wg *sync.WaitGroup) {
+func (s *Server) handleRequest(c codec.Codec, req *request, sending *sync.Mutex, wg *sync.WaitGroup, timeout time.Duration) {
 	defer wg.Done()
-	err := req.service.call(req.mtType, req.argValues, req.replyValue)
-	if err != nil {
-		req.h.Error = err.Error()
-		s.sendResponse(c, req.h, invalidRequest, sending)
+	called := make(chan struct{})
+	sent := make(chan struct{})
+
+	go func() {
+		err := req.service.call(req.mtType, req.argValues, req.replyValue)
+		called <- struct{}{}
+		if err != nil {
+			req.h.Error = err.Error()
+			s.sendResponse(c, req.h, invalidRequest, sending)
+			sent <- struct{}{}
+			return
+		}
+		s.sendResponse(c, req.h, req.replyValue.Interface(), sending)
+		sent <- struct{}{}
+	}()
+
+	if timeout == 0 {
+		<-called
+		<-sent
 		return
 	}
-	s.sendResponse(c, req.h, req.replyValue.Interface(), sending)
+
+	select {
+	case <-time.After(timeout):
+		req.h.Error = fmt.Sprintf("rpc server: request handle timeout: expect within %s", timeout)
+		s.sendResponse(c, req.h, invalidRequest, sending)
+	case <-called:
+		<-sent
+	}
 }
 
 // invalidRequest is a placeholder for response argv when error occurs
