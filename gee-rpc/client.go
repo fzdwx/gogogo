@@ -1,6 +1,7 @@
 package gee_rpc
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,8 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -189,6 +192,32 @@ func Dial(network, address string, opts ...*ProtocolOption) (client *Client, err
 	return dialTimeOut(NewClient, network, address, opts...)
 }
 
+// DialHTTP connects to an HTTP RPC server at the specified network address
+// listening on the default HTTP RPC path.
+func DialHTTP(network, address string, opts ...*ProtocolOption) (*Client, error) {
+	return dialTimeOut(NewHTTPClient, network, address, opts...)
+}
+
+// XDial calls different functions to connect to a RPC server
+// according the first parameter rpcAddr.
+// rpcAddr is a general format (protocol@addr) to represent a rpc server
+// eg, http@10.0.0.1:7001, tcp@10.0.0.1:9999, unix@/tmp/rpc.sock
+func XDial(rpcAddr string, opts ...*ProtocolOption) (*Client, error) {
+	parts := strings.Split(rpcAddr, "@")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("rpc client err: wrong format '%s', expect protocol@addr", rpcAddr)
+	}
+	protocol, addr := parts[0], parts[1]
+	switch protocol {
+	case "http":
+		return DialHTTP("tcp", addr, opts...)
+	default:
+		// tcp, unix or other transport protocol
+		return Dial(protocol, addr, opts...)
+	}
+
+}
+
 // Go invokes the function asynchronously.
 // It returns the Call structure representing the invocation.
 func (client *Client) Go(serviceMethod string, args, reply interface{}, done chan *Call) *Call {
@@ -242,6 +271,22 @@ func NewClient(conn net.Conn, opt *ProtocolOption) (*Client, error) {
 		return nil, err
 	}
 	return newClientCodec(f(conn), opt), nil
+}
+
+// NewHTTPClient new a Client instance via HTTP as transport protocol
+func NewHTTPClient(conn net.Conn, opt *ProtocolOption) (*Client, error) {
+	_, _ = io.WriteString(conn, fmt.Sprintf("%s %s HTTP/1.0\n\n", connectMethod, defaultRpcPath))
+
+	response, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: connectMethod})
+	if err == nil && response.Status == connected {
+		return NewClient(conn, opt)
+	}
+
+	if err == nil {
+		err = errors.New("unexpected HTTP response: " + response.Status)
+	}
+
+	return nil, err
 }
 
 func dialTimeOut(f newClientFunc, network, address string, opts ...*ProtocolOption) (*Client, error) {

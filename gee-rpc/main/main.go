@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -21,24 +22,15 @@ func (f Foo) Sum(args Args, reply *int) error {
 
 func startServer(addr chan string) {
 	var foo Foo
-	if err := gee_rpc.Register(&foo); err != nil {
-		log.Fatal("register error:", err)
-	}
-	// pick a free port
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		log.Fatal("network error:", err)
-	}
-	log.Println("start rpc server on", l.Addr())
+	l, _ := net.Listen("tcp", ":9999")
+	_ = gee_rpc.Register(&foo)
+	gee_rpc.HandleHTTP()
 	addr <- l.Addr().String()
-	gee_rpc.Accept(l)
+	_ = http.Serve(l, nil)
 }
 
-func main() {
-	log.SetFlags(0)
-	addr := make(chan string)
-	go startServer(addr)
-	client, _ := gee_rpc.Dial("tcp", <-addr)
+func call(addr chan string) {
+	client, _ := gee_rpc.DialHTTP("tcp", <-addr)
 	defer func() { _ = client.Close() }()
 
 	time.Sleep(time.Second)
@@ -58,4 +50,11 @@ func main() {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func main() {
+	log.SetFlags(0)
+	addr := make(chan string)
+	go call(addr)
+	startServer(addr)
 }
