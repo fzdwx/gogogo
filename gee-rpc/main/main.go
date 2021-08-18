@@ -4,12 +4,14 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 
 	gee_rpc "gee-rpc"
 	"gee-rpc/xclient"
 	"gee-rpc/xclient/discovery"
+	"gee-rpc/xclient/registry"
 )
 
 type Foo int
@@ -27,22 +29,27 @@ func (f Foo) Sleep(args Args, reply *int) error {
 	return nil
 }
 
-func startServer(addr chan string) *gee_rpc.Server {
+func startServer(registryAddr string, wg *sync.WaitGroup) {
 	var foo Foo
 	l, _ := net.Listen("tcp", ":0")
 	server := gee_rpc.NewServer()
 	_ = server.Register(&foo)
-	// server.HandleHTTP()
-	addr <- l.Addr().String()
+	registry.Heartbeat(registryAddr, "tcp@"+l.Addr().String(), 0)
+	wg.Done()
 	server.Accept(l)
-
-	return server
 }
 
-func call(addr1, addr2 string) {
-	d := discovery.NewMultiServerDiscovery([]string{"tcp@" + addr1, "tcp@" + addr2})
+func startRegistry(wg *sync.WaitGroup) {
+	l, _ := net.Listen("tcp", ":9999")
+	registry.HandleHTTP()
+	wg.Done()
+	_ = http.Serve(l, nil)
+}
+
+func call(registry string) {
+	d := discovery.NewRegistryDiscovery(registry, 0)
 	xc := xclient.NewXClient(d, discovery.RandomMode, gee_rpc.DefaultProtocolOption)
-	defer func() { _ = xc.Close() }()
+	// defer func() { _ = xc.Close() }()
 
 	// send request & receive response
 	var wg sync.WaitGroup
@@ -55,10 +62,10 @@ func call(addr1, addr2 string) {
 	}
 	wg.Wait()
 }
-func broadcast(addr1, addr2 string) {
-	d := discovery.NewMultiServerDiscovery([]string{"tcp@" + addr1, "tcp@" + addr2})
+func broadcast(registry string) {
+	d := discovery.NewRegistryDiscovery(registry, 0)
 	xc := xclient.NewXClient(d, discovery.RandomMode, gee_rpc.DefaultProtocolOption)
-	defer func() { _ = xc.Close() }()
+	// defer func() { _ = xc.Close() }()
 
 	// send request & receive response
 	var wg sync.WaitGroup
@@ -93,16 +100,17 @@ func foo(xc *xclient.XClient, ctx context.Context, typ, serviceMethod string, ar
 
 func main() {
 	log.SetFlags(0)
-	ch1 := make(chan string)
-	ch2 := make(chan string)
+	registryAddr := "http://localhost:9999" + registry.DefaultRegisterPath
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go startRegistry(&wg)
 	// start two servers
-	go startServer(ch1)
-	go startServer(ch2)
-
-	addr1 := <-ch1
-	addr2 := <-ch2
+	wg.Add(2)
+	go startServer(registryAddr, &wg)
+	go startServer(registryAddr, &wg)
 
 	time.Sleep(time.Second)
-	call(addr1, addr2)
-	broadcast(addr1, addr2)
+
+	call(registryAddr)
+	broadcast(registryAddr)
 }

@@ -81,7 +81,7 @@ func (s *service) registerMethods() {
 			ArgType:    argType,
 			ReplayType: replyType,
 		}
-		log.Printf("rpc server: register %s.%s\n", s.name, method.Name)
+		log.Printf("[ rpc server ]: register %s.%s\n", s.name, method.Name)
 	}
 }
 
