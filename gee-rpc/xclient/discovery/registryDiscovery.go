@@ -41,6 +41,7 @@ func (d *RegistryDiscovery) Update(servers []string) error {
 
 func (d *RegistryDiscovery) Refresh() error {
 	d.mu.Lock()
+	V
 	defer d.mu.Unlock()
 	if d.lastUpdate.Add(d.timeout).After(time.Now()) {
 		return nil
