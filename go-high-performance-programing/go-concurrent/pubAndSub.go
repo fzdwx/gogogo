@@ -106,8 +106,8 @@ func RunPubSubDemo() {
 	all := p.Subscribe()
 	golang := p.SubscribeTopic("golang")
 
-	p.Publish(NewMessage("golang", "hello world"))
-	p.Publish(NewMessage("all", "hello world"))
+	p.Publish(NewMessage("golang", "发给订阅了golang频道的人"))
+	p.Publish(NewMessage("all", "发给订阅了all频道的人"))
 
 	go func() {
 		for msg := range all {
@@ -123,5 +123,4 @@ func RunPubSubDemo() {
 
 	// 运行一定时间后退出
 	time.Sleep(3 * time.Second)
-	println("test")
 }
