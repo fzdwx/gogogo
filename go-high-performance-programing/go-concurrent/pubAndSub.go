@@ -9,13 +9,13 @@ import (
 type (
 	// subscriber 订阅者所拥有的管道
 	subscriber chan interface{}
-	// Message 消息
-	Message struct {
+	// message 消息
+	message struct {
 		topic string      // 当前消息的主题
 		v     interface{} // 消息的内容
 	}
-	// Publisher 发布者
-	Publisher struct {
+	// publisher 发布者
+	publisher struct {
 		rmu         sync.RWMutex          // 读写锁
 		buffer      int                   // 订阅队列的缓存大小
 		timeout     time.Duration         // 发布超时时间
@@ -23,25 +23,25 @@ type (
 	}
 )
 
-func NewMessage(topic string, v interface{}) *Message {
-	return &Message{topic: topic, v: v}
+func newMessage(topic string, v interface{}) *message {
+	return &message{topic: topic, v: v}
 }
 
-func NewPublisher(buffer int, publishTimeOut time.Duration) *Publisher {
-	return &Publisher{
+func newPublisher(buffer int, publishTimeOut time.Duration) *publisher {
+	return &publisher{
 		buffer:      buffer,
 		timeout:     publishTimeOut,
 		subscribers: make(map[subscriber]string),
 	}
 }
 
-// Subscribe 添加一个新的订阅者，订阅全部主题
-func (p *Publisher) Subscribe() chan interface{} {
-	return p.SubscribeTopic("")
+// subscribe 添加一个新的订阅者，订阅全部主题
+func (p *publisher) subscribe() chan interface{} {
+	return p.subscribeTopic("")
 }
 
 // SubscribeTopic 添加一个新的订阅者，订阅过滤器筛选后的主题
-func (p *Publisher) SubscribeTopic(topic string) chan interface{} {
+func (p *publisher) subscribeTopic(topic string) chan interface{} {
 	ch := make(chan interface{}, p.buffer)
 	p.rmu.Lock()
 	p.subscribers[ch] = topic
@@ -51,7 +51,7 @@ func (p *Publisher) SubscribeTopic(topic string) chan interface{} {
 }
 
 // Evict 退出订阅
-func (p *Publisher) Evict(sub chan interface{}) {
+func (p *publisher) evict(sub chan interface{}) {
 	p.rmu.Lock()
 	defer p.rmu.Unlock()
 
@@ -60,7 +60,7 @@ func (p *Publisher) Evict(sub chan interface{}) {
 }
 
 // Publish 发布一个消息，给所有订阅者
-func (p *Publisher) Publish(message *Message) {
+func (p *publisher) publish(message *message) {
 	p.rmu.RLock()
 	defer p.rmu.RUnlock()
 
@@ -74,7 +74,7 @@ func (p *Publisher) Publish(message *Message) {
 }
 
 // Close  关闭发布者对象，同时关闭所有的订阅者管道。
-func (p *Publisher) Close() {
+func (p *publisher) close() {
 	p.rmu.Lock()
 	defer p.rmu.Unlock()
 
@@ -85,7 +85,7 @@ func (p *Publisher) Close() {
 }
 
 // sendTopic 发送主题，可以容忍一定的超时
-func (p *Publisher) sendTopic(sub subscriber, destTopic string, message *Message, wg *sync.WaitGroup) {
+func (p *publisher) sendTopic(sub subscriber, destTopic string, message *message, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// 当目的主题不为空时判断两个主题是否相同
@@ -100,14 +100,14 @@ func (p *Publisher) sendTopic(sub subscriber, destTopic string, message *Message
 }
 
 func RunPubSubDemo() {
-	p := NewPublisher(10, 100*time.Millisecond)
-	defer p.Close()
+	p := newPublisher(10, 100*time.Millisecond)
+	defer p.close()
 
-	all := p.Subscribe()
-	golang := p.SubscribeTopic("golang")
+	all := p.subscribe()
+	golang := p.subscribeTopic("golang")
 
-	p.Publish(NewMessage("golang", "发给订阅了golang频道的人"))
-	p.Publish(NewMessage("all", "发给订阅了all频道的人"))
+	p.publish(newMessage("golang", "发给订阅了golang频道的人"))
+	p.publish(newMessage("all", "发给订阅了all频道的人"))
 
 	go func() {
 		for msg := range all {

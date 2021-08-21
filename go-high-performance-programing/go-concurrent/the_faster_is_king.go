@@ -14,13 +14,13 @@ func ThefasteriskingDemo() {
 	}()
 
 	go func() {
-		ch <- SearchByBing()
+		ch <- searchByBing()
 	}()
 
 	fmt.Println(<-ch)
 }
 
-func SearchByBing() int {
+func searchByBing() int {
 	return 1
 }
 
