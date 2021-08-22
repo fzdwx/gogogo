@@ -1,8 +1,10 @@
 package main
 
-import go_concurrent "go-high-performance-programing/go-concurrent"
+import (
+	"go-high-performance-programing/cgo"
+)
 
 func main() {
 
-	go_concurrent.RunPubSubDemo()
+	cgo.F1()
 }
