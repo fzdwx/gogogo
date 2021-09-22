@@ -1,10 +1,14 @@
 package main
 
 import (
-	"go-high-performance-programing/cgo"
+	"fmt"
 )
 
 func main() {
 
-	cgo.F1()
+	channel := make(chan int)
+	go func() {
+		fmt.Println(<-channel)
+	}()
+	channel <- 2
 }

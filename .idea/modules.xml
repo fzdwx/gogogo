@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/cache-gee/cache/cache.iml" filepath="$PROJECT_DIR$/cache-gee/cache/cache.iml" />
+      <module fileurl="file://$PROJECT_DIR$/cache-gee/cache-gee.iml" filepath="$PROJECT_DIR$/cache-gee/cache-gee.iml" />
+      <module fileurl="file://$PROJECT_DIR$/web-gee/gee/gee.iml" filepath="$PROJECT_DIR$/web-gee/gee/gee.iml" />
+      <module fileurl="file://$PROJECT_DIR$/gee-rpc/gee-rpc.iml" filepath="$PROJECT_DIR$/gee-rpc/gee-rpc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/go-high-performance-programing/go-high-performance-programing.iml" filepath="$PROJECT_DIR$/go-high-performance-programing/go-high-performance-programing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/gogogo.iml" filepath="$PROJECT_DIR$/gogogo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/study/study.iml" filepath="$PROJECT_DIR$/study/study.iml" />
+      <module fileurl="file://$PROJECT_DIR$/web-gee/web-gee.iml" filepath="$PROJECT_DIR$/web-gee/web-gee.iml" />
+    </modules>
+  </component>
+</project>
